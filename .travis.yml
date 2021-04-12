@@ -1,7 +1,13 @@
 language: go
 
+addons:
+    apt:
+        packages:
+            - etcd
+
 services:
 - docker
+#- etcd
 
 os:
 - linux
