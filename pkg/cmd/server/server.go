@@ -58,6 +58,8 @@ func main() {
 	if err != nil {
 		klog.Fatal(err)
 	}
+
+	klog.Infof("debugg arrived here", err)
 	/*
 		err = loadServerData(db.(*ovsdb.DatabaseEtcd))
 		if err != nil {

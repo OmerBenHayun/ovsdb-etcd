@@ -36,7 +36,10 @@ tidy:
 verify: $(VERIFY)
 	git diff --exit-code
 
+.PHONY: server
+server:
+	$(MAKE) -C tests/e2e/ server &
+
 .PHONY: tests
 tests:
-	$(MAKE) -C tests/e2e/ server &
 	go test -v ./...

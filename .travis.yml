@@ -42,6 +42,7 @@ jobs:
     install:
     - make install-tools
     script:
+    - make server
     - make tests
 
 notifications:
