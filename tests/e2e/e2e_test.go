@@ -14,7 +14,7 @@ import (
 	//. "github.com/onsi/gomega"
 )
 
-var serverAddr = flag.String("server", "127.0.0.1:2380", "Server address")
+var serverAddr = flag.String("server", "127.0.0.1:12345", "Server address")
 
 func listDbs(ctx context.Context, cli *jrpc2.Client) (result []string, err error) {
 	err = cli.CallResult(ctx, "list_dbs", nil, &result)

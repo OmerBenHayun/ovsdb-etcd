@@ -38,5 +38,5 @@ verify: $(VERIFY)
 
 .PHONY: tests
 tests:
-	$(MAKE) -C tests/e2e/ server
+	$(MAKE) -C tests/e2e/ server &
 	go test -v ./...
