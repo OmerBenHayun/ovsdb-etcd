@@ -22,8 +22,12 @@ func listDbs(ctx context.Context, cli *jrpc2.Client) (result []string, err error
 }
 
 var _ = Describe("E2e", func() {
+	var cli *jrpc2.Client
 	Describe("basic check", func() {
 		BeforeEach(func() {
+		})
+		AfterEach(func() {
+			defer cli.Close()
 		})
 		It("should be able to show the dbs list", func() {
 			conn, err := net.Dial(jrpc2.Network(*serverAddr), *serverAddr)
@@ -32,7 +36,7 @@ var _ = Describe("E2e", func() {
 			}
 			klog.Infof("Connected to %v", conn.RemoteAddr())
 			// Start up the client, and enable logging to stderr.
-			cli := jrpc2.NewClient(channel.RawJSON(conn, conn), &jrpc2.ClientOptions{
+			cli = jrpc2.NewClient(channel.RawJSON(conn, conn), &jrpc2.ClientOptions{
 				OnNotify: func(req *jrpc2.Request) {
 					var params json.RawMessage
 					req.UnmarshalParams(&params)
@@ -40,7 +44,6 @@ var _ = Describe("E2e", func() {
 				},
 				AllowV1: true,
 			})
-			defer cli.Close()
 			ctx := context.Background()
 
 			klog.Info("\n-- Sending some individual requests...")
