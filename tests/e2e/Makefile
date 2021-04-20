@@ -57,3 +57,5 @@ INSTALL_TOOLS += /usr/local/sbin/demo-magic.sh
 .PHONY: demo
 demo: $(INSTALL_TOOLS)
 	./demo.sh
+	
+# tmp comment
