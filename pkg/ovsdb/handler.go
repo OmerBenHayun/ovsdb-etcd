@@ -37,13 +37,22 @@ type Handler struct {
 func (ch *Handler) Transact(ctx context.Context, param []interface{}) (interface{}, error) {
 	klog.V(5).Infof("Transact request %v", param)
 	klog.Flush()
+	klog.V(5).Infof("starting libovsdb.NewTransact and save the req")
 	req, err := libovsdb.NewTransact(param)
 	if err != nil {
+		klog.Errorf("transact: got error %v", err)
 		return nil, err
 	}
+	klog.V(5).Infof("starting NewTransaction(ch.etcdClient, req) and save the txn")
 	txn := NewTransaction(ch.etcdClient, req)
+	klog.V(5).Infof("get schema")
 	txn.schemas = ch.db.GetSchemas()
-	txn.Commit()
+	klog.V(5).Infof("commit transact")
+	err = txn.Commit()
+	if err != nil {
+		klog.Errorf("commit: got error %v", err)
+		return nil, err
+	}
 	klog.V(5).Infof("Transact response %v", txn.response)
 	return txn.response.Result, nil
 }

@@ -229,6 +229,9 @@ func (cache *Cache) Validate(schemas libovsdb.Schemas) error {
 type MapUUID map[string]string
 
 func (mapUUID MapUUID) ResolvUUID(value interface{}) (interface{}, error) {
+	klog.V(5).Infof("entering ResolvUUID")
+	klog.V(5).Infof("current state")
+	klog.V(5).Infof("mapUUID is : %+v, value is : %+v",mapUUID,value)
 	namedUuid, _ := value.(libovsdb.UUID)
 	if namedUuid.GoUUID != "" && namedUuid.ValidateUUID() != nil {
 		uuid, ok := mapUUID[namedUuid.GoUUID]
@@ -269,6 +272,7 @@ func (mapUUID MapUUID) ResolvMap(value interface{}) (interface{}, error) {
 }
 
 func (mapUUID MapUUID) Resolv(value interface{}) (interface{}, error) {
+	klog.V(5).Infof("entering Resolv")
 	switch value.(type) {
 	case libovsdb.UUID:
 		return mapUUID.ResolvUUID(value)
@@ -339,6 +343,7 @@ func (txn *Transaction) Commit() error {
 	var err error
 
 	/* verify that select is not intermixed with other operations */
+	klog.V(5).Infof("entering Commit() method")
 	hasSelect := false
 	hasOther := false
 	for _, ovsOp := range txn.request.Operations {
@@ -354,11 +359,18 @@ func (txn *Transaction) Commit() error {
 		txn.response.Error = err.Error()
 		return err
 	}
+	klog.V(5).Infof("good sign:the commit does not mix between select and other Operations")
+		klog.V(5).Infof("starting to loop on the request operations")
 
 	/* fetch needed data from database needed to perform the operation */
 	for i, ovsOp := range txn.request.Operations {
+		klog.V(5).Infof("first loop: i:%+v,ovsdOp:%+v",i,ovsOp)
+		klog.V(5).Infof("calling ovsOpCallbackMap with the foloowing parameters")
+		klog.V(5).Infof("err := ovsOpCallbackMap[ovsOp.Op][0](txn, &ovsOp, &txn.response.Result[i])")
+		klog.V(5).Infof("ovsOp: %+v,ovsOp.Op: %+v, txn: %+v,i: %+v, txn.response.Result[i]: %+v",ovsOp,ovsOp.Op,txn,i,txn.response.Result[i])
 		err := ovsOpCallbackMap[ovsOp.Op][0](txn, &ovsOp, &txn.response.Result[i])
 		if err != nil {
+			klog.V(5).Infof("first loop:error on ovsOpCallbackMap %+v",err.Error())
 			txn.response.Result[i].SetError(err.Error())
 			txn.response.Error = err.Error()
 			return err
@@ -367,17 +379,23 @@ func (txn *Transaction) Commit() error {
 		if err = txn.cache.Validate(txn.schemas); err != nil {
 			panic(fmt.Sprintf("validation of %+v failed: %s", ovsOp, err.Error()))
 		}
+		klog.V(5).Infof("first loop:validation succeses for current iteration")
 	}
+	klog.V(5).Infof("finish loop,call etcdTranaction")
 	_, err = txn.etcdTranaction()
 	if err != nil {
+		klog.V(5).Infof("error during etcdTranaction")
 		txn.response.Error = err.Error()
 		return err
 	}
 
 	/* commit actual transactional changes to database */
+	klog.V(5).Infof("2'nd loop:commit actual transactional changes to database")
 	for i, ovsOp := range txn.request.Operations {
+		klog.V(5).Infof("2'nd loop: i:%+v,ovsdOp:%+v",i,ovsOp)
 		err = ovsOpCallbackMap[ovsOp.Op][1](txn, &ovsOp, &txn.response.Result[i])
 		if err != nil {
+			klog.V(5).Infof("2'nd loop:error on ovsOpCallbackMap %+v",err.Error())
 			txn.response.Result[i].SetError(err.Error())
 			txn.response.Error = err.Error()
 			return err
@@ -386,12 +404,16 @@ func (txn *Transaction) Commit() error {
 		if err = txn.cache.Validate(txn.schemas); err != nil {
 			panic(fmt.Sprintf("validation of %+v failed: %s", ovsOp, err.Error()))
 		}
+		klog.V(5).Infof("2'nd loop:validation succeses for current iteration")
 	}
+	klog.V(5).Infof("finish 2'nd loop,calling etcdTranaction")
 	_, err = txn.etcdTranaction()
 	if err != nil {
 		txn.response.Error = err.Error()
 		return err
 	}
+	klog.V(5).Infof("finish etcd Transaction")
+	klog.V(5).Infof("exiting Commit() method without errors")
 
 	return nil
 }
@@ -430,6 +452,7 @@ type Condition struct {
 }
 
 func NewCondition(tableSchema *libovsdb.TableSchema, mapUUID MapUUID, condition []interface{}) (*Condition, error) {
+	klog.V(5).Infof("entering new condition")
 	if len(condition) != 3 {
 		klog.Errorf("Expected 3 elements in condition: %v", condition)
 		return nil, errors.New(E_INTERNAL_ERROR)
@@ -707,6 +730,7 @@ func (c *Condition) Compare(row *map[string]interface{}) (bool, error) {
 }
 
 func getUUIDIfExists(tableSchema *libovsdb.TableSchema, mapUUID MapUUID, cond1 interface{}) (string, error) {
+	klog.V(5).Infof("entering getUUIDIfExists")
 	cond2, ok := cond1.([]interface{})
 	if !ok {
 		klog.Errorf("Failed to convert row value: %v", cond1)
@@ -736,6 +760,7 @@ func getUUIDIfExists(tableSchema *libovsdb.TableSchema, mapUUID MapUUID, cond1 i
 }
 
 func doesWhereContainCondTypeUUID(tableSchema *libovsdb.TableSchema, mapUUID MapUUID, where *[]interface{}) (string, error) {
+	klog.V(5).Infof("entering doesWhereContainCondTypeUUID")
 	if where == nil {
 		return "", nil
 	}
@@ -1129,16 +1154,22 @@ func etcdGetData(txn *Transaction, key *common.Key) {
 }
 
 func etcdGetByWhere(txn *Transaction, ovsOp *libovsdb.Operation, ovsResult *libovsdb.OperationResult) error {
+	klog.V(5).Infof("entering etcdGetByWhere")
+	klog.V(5).Infof("run txn.schemas.LookupTable")
 	tableSchema, err := txn.schemas.LookupTable(txn.request.DBName, *ovsOp.Table)
 	if err != nil {
 		return err
 	}
+	klog.V(5).Infof("run doesWhereContainCondTypeUUID")
 	uuid, err := doesWhereContainCondTypeUUID(tableSchema, txn.mapUUID, ovsOp.Where)
 	if err != nil {
 		return err
 	}
+	klog.V(5).Infof("run common.NewDataKey")
 	key := common.NewDataKey(txn.request.DBName, *ovsOp.Table, uuid)
+	klog.V(5).Infof("etcdGetData")
 	etcdGetData(txn, &key)
+	klog.V(5).Infof("finished etcdGetByWhere")
 	return nil
 }
 
@@ -1299,6 +1330,12 @@ func doUpdate(txn *Transaction, ovsOp *libovsdb.Operation, ovsResult *libovsdb.O
 
 /* mutate */
 func preMutate(txn *Transaction, ovsOp *libovsdb.Operation, ovsResult *libovsdb.OperationResult) error {
+	klog.V(5).Infof("enter preMutate")
+	//klog.V(5).Infof("enter preMutate with patams:")
+	//klog.V(5).Infof("all input as pointers (original shape)")
+	//klog.V(5).Infof("txn: +%v,ovsOp: +%v,ovsResult: +%v",txn,ovsOp,ovsResult)
+	//klog.V(5).Infof("derfrenceing all pointers")
+	//klog.V(5).Infof("txn: +%v,ovsOp: +%v,ovsResult: +%v",*txn,*ovsOp,*ovsResult)
 	return etcdGetByWhere(txn, ovsOp, ovsResult)
 }
 
