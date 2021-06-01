@@ -33,7 +33,7 @@ type Handler struct {
 	mu sync.Mutex
 
 	// jsonValueStr -> handlerMonitorData
-	monitors      map[string]handlerMonitorData
+	monitors      map[string]handlerMonitorData //(stirng is the json value) 
 	databaseLocks map[string]Locker
 }
 

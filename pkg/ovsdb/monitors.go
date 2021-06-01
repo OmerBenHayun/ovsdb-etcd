@@ -32,7 +32,7 @@ type handlerKey struct {
 
 type handlerMonitorData struct {
 	notificationType ovsjson.UpdateNotificationType
-	updaters         map[string][]string
+	updaters         map[string][]string // key is the table (what we want to monitor in terms of tables) and the []string is the values that we want there. 
 	dataBaseName     string
 	jsonValue        interface{}
 }

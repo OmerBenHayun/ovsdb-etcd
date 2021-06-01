@@ -16,39 +16,98 @@ import (
 
 //FIXME - omer start util rename the functions names
 //FIXME - find where these const are defined (or defined them myself using util functions.
+
 const (
 	PUT    = "put"
 	DELETE = "delete"
 	MODIFY = "modify"
 )
+
 func getUpdater(Columns []string,isV1 bool) updater {
 	return *mcrToUpdater(ovsjson.MonitorCondRequest{Columns: Columns}, isV1)
 }
-type op_data struct{
+
+type opData struct{
 	event        clientv3.Event
 	expRowUpdate *ovsjson.RowUpdate
 	err          error
 }
-type operation map[string]op_data
+
+func newPutOp(key []byte,value *map[string]interface{})opData{
+	return opData{event: clientv3.Event{Type: mvccpb.PUT,
+			Kv: &mvccpb.KeyValue{Key: key, Value: data1Json, CreateRevision: 1, ModRevision: 1}},
+			expRowUpdate: &ovsjson.RowUpdate{New: value}}
+}
+
+func newDeleteOp(key []byte,value *map[string]interface{})opData{
+	return opData{event: clientv3.Event{Type: mvccpb.DELETE,
+				PrevKv: &mvccpb.KeyValue{Key: []byte("key/db/table/000"),
+					Value: data1Json},
+				Kv: &mvccpb.KeyValue{Key: []byte("key/db/table/uuid")}},
+				expRowUpdate: &ovsjson.RowUpdate{Old: value}}
+}
+
+type operation map[string]opData
+
+func generateJsonFromData(t *testing.T,data map[string]interface{})[]byte{
+	json, err := json.Marshal(data)
+	assert.Nilf(t, err, "marshalling %v, threw %v", data, err)
+	return json
+}
+
+//TODO make this more generic in the future and not hardcoded ?
+//func generateJsonTupleFromData(t *testing.T,data map[string]interface{})([]byte,[]byte){
+func generateJsonTupleFromData(t *testing.T)([]byte,[]byte){
+	uuid := libovsdb.UUID{GoUUID: guuid.NewString()}
+	data := map[string]interface{}{"c1": "v1", "c2": "v2",COL_UUID:uuid}
+	data2 := map[string]interface{}{"c1": "v1", "c2": "v3",COL_UUID:uuid}
+	return generateJsonFromData(t,data),generateJsonFromData(t,data2)
+}
+
+type scenario struct {
+		name string  //FIXME consider remove this in the future
+		updater updater
+		op      operation
+}
+//TODO refactor this code too
+func preformTest(t *testing.T,s scenario) {
+	for opName, op := range s.op {
+		row, _, err := s.updater.prepareRowUpdate(&op.event)
+		if op.err != nil {
+			assert.EqualErrorf(t, err, op.err.Error(), "[%s-%s test] expected error %s, got %v", s.name, opName, op.err.Error(), err)
+			continue
+		} else {
+			assert.Nilf(t, err, "[%s-%s test] returned unexpected error %v", s.name, opName, err)
+		}
+		if op.expRowUpdate == nil {
+			assert.Nilf(t, row, "[%s-%s test] returned unexpected row %#v", s.name, opName, row)
+		} else {
+			assert.NotNil(t, row, "[%s-%s test] returned nil row", s.name, opName)
+			if s.updater.isV1 {
+				ok, msg := row.ValidateRowUpdate()
+				assert.Truef(t, ok, "[%s-%s test]  Row update is not valid %s %#v", s.name, opName, msg, row)
+			} else {
+				ok, msg := row.ValidateRowUpdate2()
+				assert.Truef(t, ok, "[%s-%s test]  Row update is not valid %s %#v", s.name, opName, msg, row)
+			}
+			assert.EqualValuesf(t, op.expRowUpdate, row, "[%s-%s test] returned wrong row update, expected %#v, got %#v", s.name, opName, *op.expRowUpdate, *row)
+		}
+	}
+}
+
+func TestMonitorAllColumnsV1(t *testing.T) {
+	data1Json,data2Json:=generateJsonTupleFromData(t)
+	s = scenario{
+			updater:getUpdater([]string{},true),
+			op:,
+	}
+	return
+}
 //FIXME - omer end util
 
 func TestRowUpdate(t *testing.T) {
-
-
-
-	data := map[string]interface{}{"c1": "v1", "c2": "v2"}
-	data[COL_UUID] = libovsdb.UUID{GoUUID: guuid.NewString()}
-	data1Json, err := json.Marshal(data)
-	assert.Nilf(t, err, "marshalling %v, threw %v", data, err)
-
-	data["c2"] = "v3"
-	data2Json, err := json.Marshal(data)
-	assert.Nilf(t, err, "marshalling %v, threw %v", data, err)
-
-	tests := map[string]struct {
-		updater updater
-		op      operation
-	}{"allColumns-v1": {updater: *mcrToUpdater(ovsjson.MonitorCondRequest{}, true),
+	data1Json,data2Json:=generateJsonTupleFromData(t)
+	tests := map[string]scenario{"allColumns-v1": {updater: *mcrToUpdater(ovsjson.MonitorCondRequest{}, true),
 		op: operation{PUT: {event: clientv3.Event{Type: mvccpb.PUT,
 			Kv: &mvccpb.KeyValue{Key: []byte("key/db/table/000"),
 				Value: data1Json, CreateRevision: 1, ModRevision: 1}},
