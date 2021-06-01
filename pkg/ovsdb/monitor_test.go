@@ -14,19 +14,27 @@ import (
 	"github.com/ibm/ovsdb-etcd/pkg/ovsjson"
 )
 
+//FIXME - omer start util rename the functions names
+//FIXME - find where these const are defined (or defined them myself using util functions.
+const (
+	PUT    = "put"
+	DELETE = "delete"
+	MODIFY = "modify"
+)
+func getUpdater(Columns []string,isV1 bool) updater {
+	return *mcrToUpdater(ovsjson.MonitorCondRequest{Columns: Columns}, isV1)
+}
+type op_data struct{
+	event        clientv3.Event
+	expRowUpdate *ovsjson.RowUpdate
+	err          error
+}
+type operation map[string]op_data
+//FIXME - omer end util
+
 func TestRowUpdate(t *testing.T) {
 
-	const (
-		PUT    = "put"
-		DELETE = "delete"
-		MODIFY = "modify"
-	)
 
-	type operation map[string]struct {
-		event        clientv3.Event
-		expRowUpdate *ovsjson.RowUpdate
-		err          error
-	}
 
 	data := map[string]interface{}{"c1": "v1", "c2": "v2"}
 	data[COL_UUID] = libovsdb.UUID{GoUUID: guuid.NewString()}
